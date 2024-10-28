@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lessons Learned Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Project Lessons Learned</h1>
+        <p>Document and track key insights, challenges, and improvements from your project</p>
+    </div>
+
+    <div class="form-container">
+        <form id="lessonsForm">
+            <div class="form-group">
+                <label for="title">Lesson Title</label>
+                <input type="text" id="title" required placeholder="Enter a concise title for the lesson">
+            </div>
+
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" required>
+                    <option value="">Select a category</option>
+                    <option value="success">Success/Achievement</option>
+                    <option value="challenge">Challenge/Issue</option>
+                    <option value="improvement">Improvement Opportunity</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" required placeholder="Describe what happened and why it's significant"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="impact">Impact Level</label>
+                <select id="impact" required>
+                    <option value="">Select impact level</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="recommendations">Recommendations</label>
+                <textarea id="recommendations" required placeholder="What should be done differently next time?"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="owner">Action Owner</label>
+                <input type="text" id="owner" placeholder="Who will take responsibility for the recommended actions?">
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="submit-btn">Add Lesson</button>
+                <button type="button" class="export-btn" onclick="exportToCSV()">Export to CSV</button>
+                <button type="button" class="clear-btn" onclick="clearAllLessons()">Clear All</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="cardsContainer" class="cards-container">
+        <!-- Cards will be dynamically added here -->
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
