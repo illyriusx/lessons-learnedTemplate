@@ -17,6 +17,8 @@ const optionsList = document.getElementById('optionsList');
 const matrixOcrTextEl = document.getElementById('matrixOcrText');
 const optionsOcrTextEl = document.getElementById('optionsOcrText');
 const analysisLogEl = document.getElementById('analysisLog');
+const OCR_TIMEOUT_MS = 20000;
+const MAX_OCR_DIMENSION = 1600;
 
 const imageState = {
     matrix: createImageSlot(matrixSourceCanvas, matrixPreviewCanvas, matrixCropInfo),
@@ -235,6 +237,23 @@ function cropToCanvas(slot, upscale = 2) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(slot.bitmap, crop.x, crop.y, crop.w, crop.h, 0, 0, c.width, c.height);
     return c;
+}
+
+function downscaleCanvasIfNeeded(canvas, maxDimension = MAX_OCR_DIMENSION) {
+    const largestSide = Math.max(canvas.width, canvas.height);
+    if (largestSide <= maxDimension) {
+        return canvas;
+    }
+
+    const scale = maxDimension / largestSide;
+    const resized = document.createElement('canvas');
+    resized.width = Math.max(1, Math.round(canvas.width * scale));
+    resized.height = Math.max(1, Math.round(canvas.height * scale));
+
+    const ctx = resized.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(canvas, 0, 0, resized.width, resized.height);
+    return resized;
 }
 
 function toBinary(canvas, threshold = 165) {
@@ -715,13 +734,25 @@ function chooseFromNumericOptions(options, expectedValue, log) {
 }
 
 async function runOCR(canvas, statusPrefix) {
-    const result = await Tesseract.recognize(canvas, 'eng+equ', {
+    if (!window.Tesseract) {
+        throw new Error('Tesseract kunde inte laddas. Kontrollera internetanslutning/CDN.');
+    }
+
+    const ocrCanvas = downscaleCanvasIfNeeded(canvas);
+
+    const ocrPromise = Tesseract.recognize(ocrCanvas, 'eng', {
         logger: ({ status, progress }) => {
             if (status === 'recognizing text') {
                 ui.setStatus(`${statusPrefix} OCR ${Math.round(progress * 100)}%`, 'running');
             }
         },
     });
+
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`${statusPrefix} OCR timeout efter ${OCR_TIMEOUT_MS / 1000}s`)), OCR_TIMEOUT_MS);
+    });
+
+    const result = await Promise.race([ocrPromise, timeoutPromise]);
 
     return result.data.text || '';
 }
@@ -755,16 +786,29 @@ async function solve() {
 
     const visualChoice = inferByVisualPattern(matrixFeatureGrid, visualOptions, matrixSize, log);
 
-    const matrixText = await runOCR(matrixCanvas, 'Steg 1');
-    const optionsText = await runOCR(optionsCanvas, 'Steg 2');
-    matrixOcrTextEl.textContent = matrixText.trim() || '(Ingen text i steg 1)';
-    optionsOcrTextEl.textContent = optionsText.trim() || '(Ingen text i steg 2)';
+    let matrixText = '';
+    let optionsText = '';
+    let numericMatrix = null;
+    let numericOptions = [];
+    let expectedNum = null;
+    let numericChoice = null;
 
-    const numericMatrix = extractMatrixNumbers(matrixText, matrixSize);
-    const numericOptions = extractOptionsFromText(optionsText);
-    log.push(`Textuella alternativ upptäckta: ${numericOptions.length}`);
-    const expectedNum = inferExpectedValue(numericMatrix, matrixSize, log);
-    const numericChoice = chooseFromNumericOptions(numericOptions, expectedNum, log);
+    try {
+        matrixText = await runOCR(matrixCanvas, 'Steg 1');
+        optionsText = await runOCR(optionsCanvas, 'Steg 2');
+        matrixOcrTextEl.textContent = matrixText.trim() || '(Ingen text i steg 1)';
+        optionsOcrTextEl.textContent = optionsText.trim() || '(Ingen text i steg 2)';
+
+        numericMatrix = extractMatrixNumbers(matrixText, matrixSize);
+        numericOptions = extractOptionsFromText(optionsText);
+        log.push(`Textuella alternativ upptäckta: ${numericOptions.length}`);
+        expectedNum = inferExpectedValue(numericMatrix, matrixSize, log);
+        numericChoice = chooseFromNumericOptions(numericOptions, expectedNum, log);
+    } catch (ocrError) {
+        matrixOcrTextEl.textContent = '(OCR avbröts eller timeout)';
+        optionsOcrTextEl.textContent = '(OCR avbröts eller timeout)';
+        log.push(`OCR hoppades över: ${ocrError.message}`);
+    }
 
     let final = null;
 

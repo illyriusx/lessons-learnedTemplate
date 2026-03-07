@@ -14,6 +14,7 @@ Webbapp för att lösa Matrigma-/Raven-liknande matrisuppgifter med kombinerad v
   - **Visuell pipeline** för figurmönster (fyllnad, symmetri, orientering/rotationstendens, komplexitet, komponenter).
   - **OCR-pipeline** för numeriska/textuella mönster.
   - Kombinerar resultaten när båda finns.
+- Om OCR tar för lång tid används timeout/fallback så analysen inte fastnar i evig laddning.
 - Svar ges endast från upptäckta alternativ i Steg 2.
 
 ## Start
