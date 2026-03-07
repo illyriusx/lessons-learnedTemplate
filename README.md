@@ -12,8 +12,9 @@ Webbapp för att lösa Matrigma-/Raven-liknande matrisuppgifter med kombinerad v
 - Stöd för vald matrisstorlek: **3x3, 4x4, 5x5, 6x6**.
 - Hybridanalys:
   - **Visuell pipeline** för figurmönster (fyllnad, symmetri, orientering/rotationstendens, komplexitet, komponenter).
+  - **Symbolisk grid-regelmotor** (union/intersection/XOR/subtraktion) för 3x3-matriser med block/objektlogik.
   - **OCR-pipeline** för numeriska/textuella mönster.
-  - Kombinerar resultaten när båda finns.
+  - Kombinerar resultaten när flera spår är överens.
 - Om OCR tar för lång tid används timeout/fallback så analysen inte fastnar i evig laddning.
 - Svar ges endast från upptäckta alternativ i Steg 2.
 

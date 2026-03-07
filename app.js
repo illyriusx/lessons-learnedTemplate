@@ -460,6 +460,143 @@ function computeFeatures(binary) {
     ];
 }
 
+function binaryToGlyph(binary, gridSize = 12) {
+    const { width, height, data } = binary;
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            if (data[y * width + x]) {
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+            }
+        }
+    }
+
+    if (maxX < minX || maxY < minY) {
+        return new Uint8Array(gridSize * gridSize);
+    }
+
+    const padX = Math.max(1, Math.round((maxX - minX + 1) * 0.15));
+    const padY = Math.max(1, Math.round((maxY - minY + 1) * 0.15));
+    const x0 = Math.max(0, minX - padX);
+    const y0 = Math.max(0, minY - padY);
+    const x1 = Math.min(width - 1, maxX + padX);
+    const y1 = Math.min(height - 1, maxY + padY);
+    const bw = Math.max(1, x1 - x0 + 1);
+    const bh = Math.max(1, y1 - y0 + 1);
+
+    const glyph = new Uint8Array(gridSize * gridSize);
+
+    for (let gy = 0; gy < gridSize; gy += 1) {
+        for (let gx = 0; gx < gridSize; gx += 1) {
+            const sx0 = Math.floor(x0 + (gx / gridSize) * bw);
+            const sy0 = Math.floor(y0 + (gy / gridSize) * bh);
+            const sx1 = Math.min(width, Math.ceil(x0 + ((gx + 1) / gridSize) * bw));
+            const sy1 = Math.min(height, Math.ceil(y0 + ((gy + 1) / gridSize) * bh));
+
+            let ink = 0;
+            let total = 0;
+            for (let y = sy0; y < sy1; y += 1) {
+                for (let x = sx0; x < sx1; x += 1) {
+                    ink += data[y * width + x];
+                    total += 1;
+                }
+            }
+
+            glyph[gy * gridSize + gx] = total && ink / total >= 0.22 ? 1 : 0;
+        }
+    }
+
+    return glyph;
+}
+
+function glyphHammingDistance(a, b) {
+    const len = Math.min(a.length, b.length);
+    let diff = 0;
+    for (let i = 0; i < len; i += 1) {
+        if (a[i] !== b[i]) diff += 1;
+    }
+    return len ? diff / len : 1;
+}
+
+function glyphBinaryOp(a, b, op) {
+    const out = new Uint8Array(a.length);
+    for (let i = 0; i < a.length; i += 1) {
+        if (op === 'union') out[i] = a[i] | b[i];
+        else if (op === 'intersect') out[i] = a[i] & b[i];
+        else if (op === 'xor') out[i] = a[i] ^ b[i];
+        else if (op === 'a_minus_b') out[i] = a[i] & (b[i] ? 0 : 1);
+        else if (op === 'b_minus_a') out[i] = b[i] & (a[i] ? 0 : 1);
+    }
+    return out;
+}
+
+function inferBySymbolicGridRule(matrixGlyphs, optionGlyphs, n, log) {
+    if (n !== 3 || !optionGlyphs.length) {
+        return null;
+    }
+
+    const ops = ['union', 'intersect', 'xor', 'a_minus_b', 'b_minus_a'];
+    const trainingTriples = [
+        [matrixGlyphs[0][0], matrixGlyphs[0][1], matrixGlyphs[0][2]],
+        [matrixGlyphs[1][0], matrixGlyphs[1][1], matrixGlyphs[1][2]],
+        [matrixGlyphs[0][0], matrixGlyphs[1][0], matrixGlyphs[2][0]],
+        [matrixGlyphs[0][1], matrixGlyphs[1][1], matrixGlyphs[2][1]],
+    ];
+
+    const opProfile = new Map();
+    ops.forEach((op) => opProfile.set(op, { score: 0, samples: 0 }));
+
+    for (const [a, b, c] of trainingTriples) {
+        let best = { op: null, err: Infinity };
+        for (const op of ops) {
+            const pred = glyphBinaryOp(a, b, op);
+            const err = glyphHammingDistance(pred, c);
+            if (err < best.err) best = { op, err };
+        }
+        const row = opProfile.get(best.op);
+        row.score += 1 - best.err;
+        row.samples += 1;
+    }
+
+    const rankedOps = [...opProfile.entries()]
+        .map(([op, data]) => ({ op, weight: data.samples ? data.score / data.samples : 0 }))
+        .filter((x) => x.weight > 0.35)
+        .sort((a, b) => b.weight - a.weight);
+
+    if (!rankedOps.length) {
+        return null;
+    }
+
+    let bestCandidate = null;
+
+    optionGlyphs.forEach((candidate, idx) => {
+        let cost = 0;
+        rankedOps.forEach(({ op, weight }) => {
+            const rowPred = glyphBinaryOp(matrixGlyphs[2][0], matrixGlyphs[2][1], op);
+            const colPred = glyphBinaryOp(matrixGlyphs[0][2], matrixGlyphs[1][2], op);
+            cost += glyphHammingDistance(rowPred, candidate) * (1.35 - weight);
+            cost += glyphHammingDistance(colPred, candidate) * (1.35 - weight);
+        });
+
+        if (!bestCandidate || cost < bestCandidate.score) {
+            bestCandidate = { index: idx, score: cost };
+        }
+    });
+
+    if (bestCandidate) {
+        log.push(`Symbolisk regelmotor valde kandidat #${bestCandidate.index + 1} med score ${bestCandidate.score.toFixed(4)}.`);
+    }
+
+    return bestCandidate;
+}
+
 function vectorAdd(a, b) {
     return a.map((v, i) => v + b[i]);
 }
@@ -584,6 +721,7 @@ function buildVisualOptions(optionBinary) {
             label: labels[i] || String(i + 1),
             value: 'Bildalternativ',
             features: computeFeatures(cropped),
+            glyph: binaryToGlyph(cropped),
             box,
         };
     });
@@ -780,11 +918,15 @@ async function solve() {
     const matrixBinary = toBinary(matrixCanvas, 165);
     const optionsBinary = toBinary(optionsCanvas, 165);
 
-    const matrixFeatureGrid = extractMatrixFeatureGrid(matrixBinary, matrixSize);
+    const matrixCells = splitMatrixCells(matrixBinary, matrixSize);
+    const matrixFeatureGrid = matrixCells.map((row) => row.map((cell) => computeFeatures(cell)));
+    const matrixGlyphGrid = matrixCells.map((row) => row.map((cell) => binaryToGlyph(cell)));
     const visualOptions = buildVisualOptions(optionsBinary);
+    const optionGlyphs = visualOptions.map((opt) => opt.glyph).filter(Boolean);
     log.push(`Visuella alternativ upptäckta: ${visualOptions.length}`);
 
     const visualChoice = inferByVisualPattern(matrixFeatureGrid, visualOptions, matrixSize, log);
+    const symbolicChoice = inferBySymbolicGridRule(matrixGlyphGrid, optionGlyphs, matrixSize, log);
 
     let matrixText = '';
     let optionsText = '';
@@ -812,13 +954,29 @@ async function solve() {
 
     let final = null;
 
-    if (visualChoice && numericChoice) {
+    const symbolicVisualChoice = symbolicChoice && visualOptions[symbolicChoice.index]
+        ? { ...visualOptions[symbolicChoice.index], score: symbolicChoice.score }
+        : null;
+
+    if (symbolicVisualChoice && visualChoice && symbolicVisualChoice.label === visualChoice.label) {
+        final = { ...symbolicVisualChoice, value: symbolicVisualChoice.value || 'Bildalternativ' };
+        log.push('Valde svar via samstämmig visuell + symbolisk analys.');
+    } else if (symbolicVisualChoice && numericChoice && symbolicVisualChoice.label === numericChoice.label) {
+        final = {
+            ...symbolicVisualChoice,
+            value: numericChoice.value || symbolicVisualChoice.value,
+        };
+        log.push('Valde svar via symbolisk analys + OCR-match.');
+    } else if (visualChoice && numericChoice) {
         final = {
             label: visualChoice.label,
             value: numericChoice.value || visualChoice.value,
             score: visualChoice.score,
         };
         log.push('Hybridläge: visuell struktur + OCR-värde kombinerades.');
+    } else if (symbolicVisualChoice) {
+        final = { ...symbolicVisualChoice, value: symbolicVisualChoice.value || 'Bildalternativ' };
+        log.push('Valde svar via symbolisk regelmotor.');
     } else if (visualChoice) {
         final = { ...visualChoice, value: visualChoice.value || 'Bildalternativ' };
         log.push('Valde svar via visuell matrisanalys.');
