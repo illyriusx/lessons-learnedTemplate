@@ -1,71 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lessons Learned Tracker</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matrigma Solver via Urklipp</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-    <div class="header">
-        <h1>Project Lessons Learned</h1>
-        <p>Document and track key insights, challenges, and improvements from your project</p>
-    </div>
+    <main class="app-shell">
+        <header class="hero">
+            <h1>Matrigma Solver (klistra-in + tydlig crop)</h1>
+            <p>
+                Klistra in två separata bilder: <strong>Steg 1: matris</strong> och
+                <strong>Steg 2: svarsalternativ</strong>. Appen kör både visuell figur-analys och OCR på båda,
+                och svarar endast med ett upptäckt alternativ.
+            </p>
+        </header>
 
-    <div class="form-container">
-        <form id="lessonsForm">
-            <div class="form-group">
-                <label for="title">Lesson Title</label>
-                <input type="text" id="title" required placeholder="Enter a concise title for the lesson">
+        <section class="panel">
+            <h2>Inställning: matrisstorlek</h2>
+            <label for="matrixSize">Välj storlek</label>
+            <select id="matrixSize">
+                <option value="3">3 x 3</option>
+                <option value="4">4 x 4</option>
+                <option value="5">5 x 5</option>
+                <option value="6">6 x 6</option>
+            </select>
+            <p class="hint">Tips: välj samma storlek som i uppgiften innan du löser.</p>
+        </section>
+
+        <section class="panel step-grid">
+            <article class="step-box">
+                <h2>Steg 1: Matris & figurer (klistra in)</h2>
+                <div id="matrixPasteZone" class="paste-zone" tabindex="0">
+                    Klicka här och tryck <kbd>Ctrl/Cmd + V</kbd> för att klistra in matrisbild.
+                </div>
+                <div class="crop-controls">
+                    <button id="matrixResetCropBtn" class="secondary">Återställ crop</button>
+                    <span id="matrixCropInfo" class="small-note">Crop: full bild</span>
+                </div>
+                <canvas id="matrixSourceCanvas" class="source-canvas"></canvas>
+                <h3>Förhandsvisning (crop + detalj)</h3>
+                <canvas id="matrixPreviewCanvas" class="preview-canvas"></canvas>
+            </article>
+
+            <article class="step-box">
+                <h2>Steg 2: Svarsalternativ (klistra in)</h2>
+                <div id="optionsPasteZone" class="paste-zone" tabindex="0">
+                    Klicka här och tryck <kbd>Ctrl/Cmd + V</kbd> för att klistra in alternativbild.
+                </div>
+                <div class="crop-controls">
+                    <button id="optionsResetCropBtn" class="secondary">Återställ crop</button>
+                    <span id="optionsCropInfo" class="small-note">Crop: full bild</span>
+                </div>
+                <canvas id="optionsSourceCanvas" class="source-canvas"></canvas>
+                <h3>Förhandsvisning (crop + detalj)</h3>
+                <canvas id="optionsPreviewCanvas" class="preview-canvas"></canvas>
+            </article>
+        </section>
+
+        <section class="panel actions">
+            <h2>Analys</h2>
+            <button id="solveBtn" class="primary">Kör OCR + Lös</button>
+            <button id="resetBtn" class="secondary">Återställ allt</button>
+            <div id="status" class="status idle">Väntar på inklistrade bilder…</div>
+        </section>
+
+        <section class="panel results">
+            <h2>Resultat</h2>
+            <div class="result-grid">
+                <div>
+                    <h3>Valt svar</h3>
+                    <div id="finalAnswer" class="answer">Inget svar ännu</div>
+                    <p class="small-note">Svar ges endast från upptäckta alternativ i steg 2.</p>
+                </div>
+                <div>
+                    <h3>Upptäckta svarsalternativ</h3>
+                    <ul id="optionsList" class="options"></ul>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label for="category">Category</label>
-                <select id="category" required>
-                    <option value="">Select a category</option>
-                    <option value="success">Success/Achievement</option>
-                    <option value="challenge">Challenge/Issue</option>
-                    <option value="improvement">Improvement Opportunity</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" required placeholder="Describe what happened and why it's significant"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="impact">Impact Level</label>
-                <select id="impact" required>
-                    <option value="">Select impact level</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="recommendations">Recommendations</label>
-                <textarea id="recommendations" required placeholder="What should be done differently next time?"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="owner">Action Owner</label>
-                <input type="text" id="owner" placeholder="Who will take responsibility for the recommended actions?">
-            </div>
-
-            <div class="button-group">
-                <button type="submit" class="submit-btn">Add Lesson</button>
-                <button type="button" class="export-btn" onclick="exportToCSV()">Export to CSV</button>
-                <button type="button" class="clear-btn" onclick="clearAllLessons()">Clear All</button>
-            </div>
-        </form>
-    </div>
-
-    <div id="cardsContainer" class="cards-container">
-        <!-- Cards will be dynamically added here -->
-    </div>
+            <details>
+                <summary>Visa OCR-text + analyslogg</summary>
+                <h4>OCR matris</h4>
+                <pre id="matrixOcrText" class="log"></pre>
+                <h4>OCR svarsalternativ</h4>
+                <pre id="optionsOcrText" class="log"></pre>
+                <h4>Analys</h4>
+                <pre id="analysisLog" class="log"></pre>
+            </details>
+        </section>
+    </main>
 
     <script src="app.js"></script>
 </body>
