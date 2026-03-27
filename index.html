@@ -1,72 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lessons Learned Tracker</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dot Pattern Reasoning Solver</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="header">
-        <h1>Project Lessons Learned</h1>
-        <p>Document and track key insights, challenges, and improvements from your project</p>
-    </div>
+  <main class="app-shell">
+    <header>
+      <h1>Dot Pattern Reasoning Solver</h1>
+      <p>
+        Build abstract-reasoning dot puzzles and let the engine predict the best next frame.
+      </p>
+    </header>
 
-    <div class="form-container">
-        <form id="lessonsForm">
-            <div class="form-group">
-                <label for="title">Lesson Title</label>
-                <input type="text" id="title" required placeholder="Enter a concise title for the lesson">
-            </div>
+    <section class="controls card">
+      <div class="row">
+        <label for="gridSize">Grid size</label>
+        <select id="gridSize">
+          <option value="3">3 × 3</option>
+          <option value="4" selected>4 × 4</option>
+          <option value="5">5 × 5</option>
+          <option value="6">6 × 6</option>
+        </select>
 
-            <div class="form-group">
-                <label for="category">Category</label>
-                <select id="category" required>
-                    <option value="">Select a category</option>
-                    <option value="success">Success/Achievement</option>
-                    <option value="challenge">Challenge/Issue</option>
-                    <option value="improvement">Improvement Opportunity</option>
-                </select>
-            </div>
+        <button id="resetBtn" class="secondary">Reset Puzzle</button>
+        <button id="sampleBtn" class="secondary">Load Sample</button>
+      </div>
+      <p class="hint">Click cells to toggle dots. Fill Sequence A→C and four answer choices, then press <b>Solve</b>.</p>
+    </section>
 
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" required placeholder="Describe what happened and why it's significant"></textarea>
-            </div>
+    <section class="workspace">
+      <div class="card">
+        <h2>Sequence</h2>
+        <div class="grid-wrap" id="sequenceWrap"></div>
+      </div>
 
-            <div class="form-group">
-                <label for="impact">Impact Level</label>
-                <select id="impact" required>
-                    <option value="">Select impact level</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
+      <div class="card">
+        <h2>Answer Options</h2>
+        <div class="grid-wrap" id="optionsWrap"></div>
+      </div>
+    </section>
 
-            <div class="form-group">
-                <label for="recommendations">Recommendations</label>
-                <textarea id="recommendations" required placeholder="What should be done differently next time?"></textarea>
-            </div>
+    <section class="card action-row">
+      <button id="solveBtn" class="primary">Solve</button>
+      <button id="explainBtn" class="secondary">Explain Last Result</button>
+      <div id="result" class="result">No prediction yet.</div>
+    </section>
 
-            <div class="form-group">
-                <label for="owner">Action Owner</label>
-                <input type="text" id="owner" placeholder="Who will take responsibility for the recommended actions?">
-            </div>
+    <section class="card">
+      <h2>How it solves</h2>
+      <ul>
+        <li>Tracks dot-count progressions (linear and ratio).</li>
+        <li>Detects geometric transforms: translation, rotation, and mirror reflection.</li>
+        <li>Checks set operations between frames (union / intersection / XOR).</li>
+        <li>Scores each answer by rule consistency and confidence.</li>
+      </ul>
+      <pre id="explanation" class="explanation">Run the solver to generate a rule trace.</pre>
+    </section>
+  </main>
 
-            <div class="button-group">
-                <button type="submit" class="submit-btn">Add Lesson</button>
-                <button type="button" class="export-btn" onclick="exportToCSV()">Export to CSV</button>
-                <button type="button" class="clear-btn" onclick="clearAllLessons()">Clear All</button>
-            </div>
-        </form>
-    </div>
-
-    <div id="cardsContainer" class="cards-container">
-        <!-- Cards will be dynamically added here -->
-    </div>
-
-    <script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
